@@ -94,16 +94,7 @@ class GPTModelBase(MegatronModule):
             args = [gpt_model_input, attention_mask]
         lm_output = self.language_model(*args, **kwargs)
 
-        if mpu.is_pipeline_last_stage():
-            return post_language_model_processing(
-                lm_output, labels,
-                self.word_embeddings_weight(),
-                get_key_value,
-                self.parallel_output,
-                forward_method_parallel_output,
-                self.fp16_lm_cross_entropy)
-        else:
-            return lm_output
+        return lm_output
 
     def state_dict_for_save_checkpoint(self, destination=None, prefix='',
                                        keep_vars=False):

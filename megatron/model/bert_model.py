@@ -181,14 +181,7 @@ class BertModelBase(MegatronModule):
         else:
             pooled_output = None
 
-        if mpu.is_pipeline_last_stage():
-            return post_language_model_processing(lm_output, pooled_output,
-                                                  self.lm_head, self.binary_head,
-                                                  lm_labels,
-                                                  self.word_embeddings_weight(),
-                                                  self.fp16_lm_cross_entropy)
-        else:
-            return lm_output
+        return lm_output
 
 
     def state_dict_for_save_checkpoint(self, destination=None, prefix='',

@@ -28,12 +28,6 @@ from megatron.model.fused_softmax import FusedScaleMaskSoftmax
 from megatron.model.fused_bias_gelu import bias_gelu_impl
 from megatron.model.utils import openai_gelu, erf_gelu
 
-# flags required to enable jit fusion kernels
-torch._C._jit_set_profiling_mode(False)
-torch._C._jit_set_profiling_executor(False)
-torch._C._jit_override_can_fuse_on_cpu(True)
-torch._C._jit_override_can_fuse_on_gpu(True)
-
 """ We use the following notation throughout this file:
      h: hidden size
      n: number of attention heads
@@ -598,7 +592,7 @@ class ParallelTransformer(MegatronModule):
         if mpu.is_pipeline_last_stage():
             # Reverting data format change [s b h] --> [b s h].
             hidden_states = hidden_states.transpose(0, 1).contiguous()
-            output = self.final_layernorm(hidden_states)
+            output = hidden_states
         else:
             output = hidden_states
         if get_key_value:

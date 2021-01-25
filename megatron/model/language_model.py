@@ -186,8 +186,6 @@ class Embedding(MegatronModule):
         if tokentype_ids is not None:
             assert self.tokentype_embeddings is not None
             embeddings = embeddings + self.tokentype_embeddings(tokentype_ids)
-        else:
-            assert self.tokentype_embeddings is None
 
         # Dropout.
         embeddings = self.embedding_dropout(embeddings)

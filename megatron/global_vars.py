@@ -83,7 +83,6 @@ def set_global_variables(extra_args_provider=None, args_defaults={},
                        defaults=args_defaults,
                        ignore_unknown_args=ignore_unknown_args)
     _build_num_microbatches_calculator(args)
-    _ = _build_tokenizer(args)
     _set_tensorboard_writer(args)
     _set_adlr_autoresume(args)
     _set_timers()
