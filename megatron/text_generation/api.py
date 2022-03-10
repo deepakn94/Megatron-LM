@@ -17,6 +17,7 @@ from .tokenization import (
 
 def generate_and_post_process(model,
                               prompts=None,
+                              num_input_tokens=-1,
                               tokens_to_generate=0,
                               return_output_log_probs=False,
                               top_k_sampling=0,
@@ -37,6 +38,7 @@ def generate_and_post_process(model,
     tokens, lengths, output_log_probs = generate(
         model,
         prompts=prompts,
+        num_input_tokens=num_input_tokens,
         tokens_to_generate=tokens_to_generate,
         return_output_log_probs=return_output_log_probs,
         top_k_sampling=top_k_sampling,
@@ -68,6 +70,7 @@ def generate_and_post_process(model,
 
 def generate(model,
              prompts=None,
+             num_input_tokens=-1,
              tokens_to_generate=0,
              return_output_log_probs=False,
              top_k_sampling=0,
@@ -90,7 +93,7 @@ def generate(model,
     """
 
     # Make sure input params are avaialble to all ranks.
-    values = [tokens_to_generate,
+    values = [num_input_tokens, tokens_to_generate,
               return_output_log_probs,
               top_k_sampling, top_p_sampling, top_p_decay, top_p_bound,
               temperature, add_BOS, use_eod_token_for_early_termination,
@@ -99,19 +102,20 @@ def generate(model,
               prevent_newline_after_colon,
               random_seed]
     values_float_tensor = broadcast_float_list(len(values), float_list=values)
-    tokens_to_generate = int(values_float_tensor[0].item())
-    return_output_log_probs = bool(values_float_tensor[1].item())
-    top_k_sampling = int(values_float_tensor[2].item())
-    top_p_sampling = values_float_tensor[3].item()
-    top_p_decay = values_float_tensor[4].item()
-    top_p_bound = values_float_tensor[5].item()
-    temperature = values_float_tensor[6].item()
-    add_BOS = bool(values_float_tensor[7].item())
-    use_eod_token_for_early_termination = bool(values_float_tensor[8].item())
-    stop_on_double_eol = bool(values_float_tensor[9].item())
-    stop_on_eol = bool(values_float_tensor[10].item())
-    prevent_newline_after_colon = bool(values_float_tensor[11].item())
-    random_seed = int(values_float_tensor[12].item())
+    num_input_tokens = int(values_float_tensor[0].item())
+    tokens_to_generate = int(values_float_tensor[1].item())
+    return_output_log_probs = bool(values_float_tensor[2].item())
+    top_k_sampling = int(values_float_tensor[3].item())
+    top_p_sampling = values_float_tensor[4].item()
+    top_p_decay = values_float_tensor[5].item()
+    top_p_bound = values_float_tensor[6].item()
+    temperature = values_float_tensor[7].item()
+    add_BOS = bool(values_float_tensor[8].item())
+    use_eod_token_for_early_termination = bool(values_float_tensor[9].item())
+    stop_on_double_eol = bool(values_float_tensor[10].item())
+    stop_on_eol = bool(values_float_tensor[11].item())
+    prevent_newline_after_colon = bool(values_float_tensor[12].item())
+    random_seed = int(values_float_tensor[13].item())
 
     if random_seed != -1:
         torch.random.manual_seed(random_seed)
@@ -122,7 +126,8 @@ def generate(model,
         assert prompts is not None
     
     context_tokens_tensor, context_length_tensor = tokenize_prompts(
-        prompts=prompts, tokens_to_generate=tokens_to_generate, add_BOS=add_BOS)
+        prompts=prompts, num_input_tokens=num_input_tokens,
+        tokens_to_generate=tokens_to_generate, add_BOS=add_BOS)
 
     if tokens_to_generate == 0:
         return score_and_return_on_first_stage(
