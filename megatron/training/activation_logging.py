@@ -1,6 +1,6 @@
 # Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
 
-"""dgrad logging using backward hooks."""
+"""Forward activation logging using forward hooks."""
 
 from collections import defaultdict
 import torch
@@ -13,7 +13,7 @@ from .utils import unwrap_model
 
 
 def _get_linear_types():
-    """Build tuple of linear layer types to capture gradients from."""
+    """Build tuple of linear layer types to capture activations from."""
     types = [nn.Linear, nn.Embedding, ColumnParallelLinear, RowParallelLinear]
 
     # Add Transformer Engine layers if available.
@@ -47,46 +47,44 @@ def _get_linear_types():
 LINEAR_TYPES = _get_linear_types()
 
 
-class DataGradLogger:
-    """Captures and saves gradients from all linear layers using backward hooks.
-    
-    NOTE: Right now, we only save the dgrads for the last microbatch in a batch on DP replica 0.
-    The code below would need to be extended to save dgrads for all microbatches in a batch."""
+class ActivationLogger:
+    """Captures and saves forward activations from all linear layers using forward hooks."""
 
-    def __init__(self, save_dir: str):
-        self._save_dir = save_dir
-        self._dgrads_state_dict = defaultdict(dict)
+    def __init__(self):
+        self._activations_state_dict = defaultdict(dict)
         self._hooks = []
 
     def _make_hook(self, model_chunk_name: str, module_name: str):
-        """Create a backward hook for a named module."""
-        def hook(_, grad_input, grad_output):
-            for idx, grad in enumerate(grad_output):
-                if grad is not None:
-                    grad_name = f"{module_name}/output{idx}"
-                    self._dgrads_state_dict[model_chunk_name][grad_name] = grad.detach().cpu()
-            for idx, grad in enumerate(grad_input):
-                if grad is not None:
-                    grad_name = f"{module_name}/input{idx}"
-                    self._dgrads_state_dict[model_chunk_name][grad_name] = grad.detach().cpu()
+        """Create a forward hook for a named module."""
+        def hook(_, input, output):
+            input_tuple = input if isinstance(input, tuple) else (input,)
+            for idx, inp in enumerate(input_tuple):
+                if inp is not None and isinstance(inp, torch.Tensor):
+                    name = f"{module_name}/input{idx}"
+                    self._activations_state_dict[model_chunk_name][name] = inp.detach().cpu()
+            output_tuple = output if isinstance(output, tuple) else (output,)
+            for idx, out in enumerate(output_tuple):
+                if out is not None and isinstance(out, torch.Tensor):
+                    name = f"{module_name}/output{idx}"
+                    self._activations_state_dict[model_chunk_name][name] = out.detach().cpu()
         return hook
 
     def save(self, iteration: int):
-        """Save captured gradients to disk and clear the buffer."""
-        if not self._dgrads_state_dict:
+        """Save captured activations to disk and clear the buffer."""
+        if not self._activations_state_dict:
             return
-        save_state_dict(self._dgrads_state_dict, iteration, "dgrads")
-        self._dgrads_state_dict.clear()
+        save_state_dict(self._activations_state_dict, iteration, "activations")
+        self._activations_state_dict.clear()
 
     def register_hooks(self, model: torch.nn.Module):
-        """Find and register hooks on all linear layers."""
+        """Find and register forward hooks on all linear layers."""
         assert len(self._hooks) == 0
         for model_chunk_id, model_chunk in enumerate(model):
             unwrapped_model_chunk = unwrap_model(model_chunk)
             for module_name, module in unwrapped_model_chunk.named_modules():
                 if isinstance(module, LINEAR_TYPES):
                     model_chunk_name = f"model_chunk{model_chunk_id}"
-                    handle = module.register_full_backward_hook(
+                    handle = module.register_forward_hook(
                         self._make_hook(model_chunk_name, module_name)
                     )
                     self._hooks.append(handle)
@@ -101,23 +99,23 @@ class DataGradLogger:
 _LOGGER = None
 
 
-def enable_dgrad_logging(model: torch.nn.Module, save_dir: str):
-    """Enable dgrad logging on a model."""
+def enable_activation_logging(model: torch.nn.Module):
+    """Enable activation logging on a model."""
     global _LOGGER
     if _LOGGER is None:
-        _LOGGER = DataGradLogger(save_dir)
+        _LOGGER = ActivationLogger()
     _LOGGER.register_hooks(model)
 
 
-def disable_dgrad_logging():
-    """Disable dgrad logging on a model."""
+def disable_activation_logging():
+    """Disable activation logging on a model."""
     global _LOGGER
     assert _LOGGER is not None
     _LOGGER.remove_hooks()
 
 
-def save_dgrads(iteration: int):
-    """Save dgrads to disk."""
+def save_activations(iteration: int):
+    """Save activations to disk."""
     global _LOGGER
     assert _LOGGER is not None
     _LOGGER.save(iteration)
