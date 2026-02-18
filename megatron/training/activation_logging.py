@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
+from megatron.core.transformer.moe.router import Router
 
 from .checkpointing import save_state_dict
 from .utils import unwrap_model
@@ -14,17 +15,18 @@ from .utils import unwrap_model
 
 def _get_linear_types():
     """Build tuple of linear layer types to capture activations from."""
-    types = [nn.Linear, nn.Embedding, ColumnParallelLinear, RowParallelLinear]
+    types = [nn.Linear, nn.Embedding, ColumnParallelLinear, RowParallelLinear, Router]
 
     # Add Transformer Engine layers if available.
     try:
         from megatron.core.extensions.transformer_engine import (
             TELinear,
+            TENorm,
             TEColumnParallelLinear,
             TERowParallelLinear,
             TELayerNormColumnParallelLinear,
         )
-        types.extend([TELinear, TEColumnParallelLinear, TERowParallelLinear,
+        types.extend([TELinear, TENorm, TEColumnParallelLinear, TERowParallelLinear,
                       TELayerNormColumnParallelLinear])
     except ImportError:
         pass
