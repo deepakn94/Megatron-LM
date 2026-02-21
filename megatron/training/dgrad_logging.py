@@ -65,12 +65,12 @@ class DataGradLogger:
         def hook(_, grad_input, grad_output):
             for idx, grad in enumerate(grad_output):
                 if grad is not None:
-                    grad_name = f"{module_name}/output{idx}"
-                    self._dgrads_state_dict[model_chunk_name][grad_name] = grad.detach().cpu()
+                    key = f"{module_name}/output{idx}"
+                    self._dgrads_state_dict[model_chunk_name][key] = grad.detach().cpu()
             for idx, grad in enumerate(grad_input):
                 if grad is not None:
-                    grad_name = f"{module_name}/input{idx}"
-                    self._dgrads_state_dict[model_chunk_name][grad_name] = grad.detach().cpu()
+                    key = f"{module_name}/input{idx}"
+                    self._dgrads_state_dict[model_chunk_name][key] = grad.detach().cpu()
         return hook
 
     def save(self, iteration: int):

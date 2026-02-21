@@ -57,18 +57,28 @@ class ActivationLogger:
         self._hooks = []
 
     def _make_hook(self, model_chunk_name: str, module_name: str):
-        """Create a forward hook for a named module."""
-        def hook(_, input, output):
-            input_tuple = input if isinstance(input, tuple) else (input,)
+        """Create a forward hook for a named module (with_kwargs=True: args, kwargs, output)."""
+        def hook(_, args, kwargs, output):
+            input_tuple = args if isinstance(args, tuple) else (args,)
             for idx, inp in enumerate(input_tuple):
-                if inp is not None and isinstance(inp, torch.Tensor):
-                    name = f"{module_name}/input{idx}"
-                    self._activations_state_dict[model_chunk_name][name] = inp.detach().cpu()
+                if inp is None:
+                    continue
+                key = f"{module_name}/input{idx}"
+                if isinstance(inp, torch.Tensor):
+                    self._activations_state_dict[model_chunk_name][key] = inp.detach().cpu()
+                else:
+                    self._activations_state_dict[model_chunk_name][key] = inp
             output_tuple = output if isinstance(output, tuple) else (output,)
             for idx, out in enumerate(output_tuple):
                 if out is not None and isinstance(out, torch.Tensor):
-                    name = f"{module_name}/output{idx}"
-                    self._activations_state_dict[model_chunk_name][name] = out.detach().cpu()
+                    key = f"{module_name}/output{idx}"
+                    self._activations_state_dict[model_chunk_name][key] = out.detach().cpu()
+            for kwarg_key, kwarg_value in kwargs.items():
+                key = f"{module_name}/{kwarg_key}"
+                if isinstance(kwarg_value, torch.Tensor):
+                    self._activations_state_dict[model_chunk_name][key] = kwarg_value.detach().cpu()
+                else:
+                    self._activations_state_dict[model_chunk_name][key] = kwarg_value
         return hook
 
     def save(self, iteration: int):
@@ -87,7 +97,8 @@ class ActivationLogger:
                 if isinstance(module, LINEAR_TYPES):
                     model_chunk_name = f"model_chunk{model_chunk_id}"
                     handle = module.register_forward_hook(
-                        self._make_hook(model_chunk_name, module_name)
+                        self._make_hook(model_chunk_name, module_name),
+                        with_kwargs=True,
                     )
                     self._hooks.append(handle)
 
