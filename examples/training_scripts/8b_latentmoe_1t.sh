@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -p batch
-#SBATCH --account=llmservice_fm_text
+#SBATCH --account=nemotron_sw_pre
 #SBATCH --nodes=96
 #SBATCH --exclusive
 #SBATCH -t 4:00:00
@@ -52,11 +52,9 @@ BLEND_PATH="${ROOT_DIR}/blend_files/1t_singlephase.json"
 
 
 options=" \
-    --is-hybrid-model \
     --use-mcore-models \
-    --num-layers 61 \
-    --hybrid-override-pattern MEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEME \
-    --spec megatron.core.models.mamba.mamba_layer_specs mamba_stack_spec \
+    --hybrid-layer-pattern MEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEME/*E/*E \
+    --spec megatron.core.models.hybrid.hybrid_layer_specs hybrid_stack_spec \
     --hidden-size 4608 \
     --num-attention-heads 40 \
     --group-query-attention \
@@ -88,10 +86,7 @@ options=" \
     --moe-permute-fusion \
     --use-fused-weighted-squared-relu \
     \
-    --mtp-spec megatron.core.models.mamba.mamba_layer_specs mamba_stack_spec \
-    --mtp-num-layers 2 \
-    --mtp-num-layers-per-layer 2 \
-    --mtp-hybrid-override-pattern *E \
+    --mtp-spec megatron.core.models.hybrid.hybrid_layer_specs hybrid_stack_spec \
     --mtp-loss-scaling-factor 0.3 \
     --calculate-per-token-loss \
     \
@@ -115,8 +110,8 @@ options=" \
     --eval-interval 1000 \
     --eval-iters 14 \
     \
-    --enable-cuda-graph \
-    --cuda-graph-scope mamba attn moe_router \
+    --cuda-graph-impl local \
+    --cuda-graph-modules mamba attn moe_router \
     --te-rng-tracker \
     --no-load-rng \
     \
@@ -174,7 +169,7 @@ options=" \
     --disable-straggler-on-startup \
     --straggler-minmax-count 16 "
 
-run_cmd="python -u ${REPO_DIR}/pretrain_mamba.py ${options}"
+run_cmd="python -u ${REPO_DIR}/pretrain_hybrid.py ${options}"
 
 # Adjust --container-mounts below if ROOT_DIR lives on a different filesystem
 # (e.g. "/scratch:/scratch" on clusters where assets live under /scratch).

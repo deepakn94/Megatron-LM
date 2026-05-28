@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -p batch
-#SBATCH --account=llmservice_fm_text
+#SBATCH --account=nemotron_sw_pre
 #SBATCH --nodes=96
 #SBATCH --exclusive
 #SBATCH -t 4:00:00

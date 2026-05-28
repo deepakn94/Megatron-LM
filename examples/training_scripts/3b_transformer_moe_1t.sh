@@ -11,7 +11,7 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
 #SBATCH --dependency=singleton
-#SBATCH --job-name=3b_moe_1t
+#SBATCH --job-name=3b_transformer_moe_1t
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export NVTE_FWD_LAYERNORM_SM_MARGIN=16
@@ -27,7 +27,7 @@ export TRITON_CACHE_DIR="/tmp/triton_cache/"
 ROOT_DIR=""
 REPO_DIR="${ROOT_DIR}/code"
 # Run name; change this per experiment.
-NAME="3b_moe_1t"
+NAME="3b_transformer_moe_1t"
 IMAGE_PATH="${ROOT_DIR}/images/nvidia+pytorch+25.06-py3+dependencies+mamba.sqsh"
 
 DATETIME=`date +'date_%y-%m-%d_time_%H-%M-%S'`
@@ -53,13 +53,12 @@ BLEND_PATH="${ROOT_DIR}/blend_files/1t_singlephase.json"
 
 options=" \
     --use-mcore-models \
-    --hybrid-layer-pattern MEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEMEM*EMEMEMEME \
+    --hybrid-layer-pattern *E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E \
     --spec megatron.core.models.hybrid.hybrid_layer_specs hybrid_stack_spec \
     --hidden-size 2688 \
     --num-attention-heads 32 \
     --group-query-attention \
     --num-query-groups 2 \
-    --mamba-num-heads 64 \
     --ffn-hidden-size 1856 \
     --kv-channels 128 \
     --squared-relu \
