@@ -11,7 +11,7 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
 #SBATCH --dependency=singleton
-#SBATCH --job-name=3b_moe_1t
+#SBATCH --job-name=a8b_120b_latentmoe_1t
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export NVTE_FWD_LAYERNORM_SM_MARGIN=16
@@ -27,7 +27,7 @@ export TRITON_CACHE_DIR="/tmp/triton_cache/"
 ROOT_DIR=""
 REPO_DIR="${ROOT_DIR}/code"
 # Run name; change this per experiment.
-NAME="3b_moe_1t"
+NAME="a8b_120b_latentmoe_1t"
 IMAGE_PATH="${ROOT_DIR}/images/nvidia+pytorch+25.06-py3+dependencies+mamba.sqsh"
 
 DATETIME=`date +'date_%y-%m-%d_time_%H-%M-%S'`
@@ -53,27 +53,28 @@ BLEND_PATH="${ROOT_DIR}/blend_files/1t_singlephase.json"
 
 options=" \
     --use-mcore-models \
-    --hybrid-layer-pattern MEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEMEM*EMEMEMEME \
+    --hybrid-layer-pattern MEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEME/*E/*E \
     --spec megatron.core.models.hybrid.hybrid_layer_specs hybrid_stack_spec \
-    --hidden-size 2688 \
-    --num-attention-heads 32 \
+    --hidden-size 4608 \
+    --num-attention-heads 40 \
     --group-query-attention \
-    --num-query-groups 2 \
-    --mamba-num-heads 64 \
-    --ffn-hidden-size 1856 \
+    --num-query-groups 8 \
+    --mamba-num-heads 128 \
+    --ffn-hidden-size 3072 \
     --kv-channels 128 \
     --squared-relu \
     --untie-embeddings-and-output-weights \
-    --init-method-std 0.0173 \
+    --init-method-std 0.0132 \
     --position-embedding-type none \
     --attention-dropout 0.0 \
     --hidden-dropout 0.0 \
     --disable-bias-linear \
     --normalization RMSNorm \
     \
-    --num-experts 128 \
+    --num-experts 512 \
     --moe-router-topk 6 \
-    --moe-shared-expert-intermediate-size 3712 \
+    --moe-shared-expert-intermediate-size 6144 \
+    --moe-latent-size 1152 \
     --moe-token-dispatcher-type alltoall \
     --moe-router-score-function sigmoid \
     --moe-grouped-gemm \
@@ -85,19 +86,23 @@ options=" \
     --moe-permute-fusion \
     --use-fused-weighted-squared-relu \
     \
+    --mtp-spec megatron.core.models.hybrid.hybrid_layer_specs hybrid_stack_spec \
+    --mtp-loss-scaling-factor 0.3 \
+    --calculate-per-token-loss \
+    \
     --bf16 \
     --seq-length 8192 \
     --max-position-embeddings 8192 \
     --train-samples 122070313 \
     --lr-decay-style WSD \
     --lr-decay-samples 122070313 \
-    --lr-warmup-samples 1024000 \
+    --lr-warmup-samples 3051758 \
     --lr-wsd-decay-style minus_sqrt \
-    --lr-wsd-decay-samples 18310547 \
+    --lr-wsd-decay-samples 24414063 \
     --micro-batch-size 1 \
-    --global-batch-size 768 \
-    --lr 1.2e-3 \
-    --min-lr 1.2e-5 \
+    --global-batch-size 3072 \
+    --lr 8e-4 \
+    --min-lr 8e-6 \
     --weight-decay 0.1 \
     --clip-grad 1.0 \
     --adam-beta1 0.9 \
@@ -124,12 +129,14 @@ options=" \
     --overlap-param-gather \
     --tensor-model-parallel-size 2 \
     --sequence-parallel \
-    --expert-model-parallel-size 32 \
+    --expert-model-parallel-size 16 \
     --expert-tensor-parallel-size 1 \
     --pipeline-model-parallel-size 1 \
     --high-priority-stream-groups ep \
     --ddp-num-buckets 8 \
     --attention-backend flash \
+    --recompute-granularity selective \
+    --recompute-modules moe \
     \
     --ckpt-format torch_dist \
     --load ${CHECKPOINT_DIR} \

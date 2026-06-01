@@ -2,7 +2,7 @@
 
 #SBATCH -p batch
 #SBATCH --account=nemotron_sw_pre
-#SBATCH --nodes=96
+#SBATCH --nodes=32
 #SBATCH --exclusive
 #SBATCH -t 4:00:00
 #SBATCH --mem=0
@@ -11,7 +11,7 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
 #SBATCH --dependency=singleton
-#SBATCH --job-name=3b_transformer_moe_1t
+#SBATCH --job-name=a500m_2b_moe_140b
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export NVTE_FWD_LAYERNORM_SM_MARGIN=16
@@ -27,7 +27,7 @@ export TRITON_CACHE_DIR="/tmp/triton_cache/"
 ROOT_DIR=""
 REPO_DIR="${ROOT_DIR}/code"
 # Run name; change this per experiment.
-NAME="3b_transformer_moe_1t"
+NAME="a500m_2b_moe_140b"
 IMAGE_PATH="${ROOT_DIR}/images/nvidia+pytorch+25.06-py3+dependencies+mamba.sqsh"
 
 DATETIME=`date +'date_%y-%m-%d_time_%H-%M-%S'`
@@ -53,17 +53,18 @@ BLEND_PATH="${ROOT_DIR}/blend_files/1t_singlephase.json"
 
 options=" \
     --use-mcore-models \
-    --hybrid-layer-pattern *E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E*E \
+    --hybrid-layer-pattern MEMEM*EMEMEM*EMEMEM*EMEMEME \
     --spec megatron.core.models.hybrid.hybrid_layer_specs hybrid_stack_spec \
-    --hidden-size 2688 \
-    --num-attention-heads 32 \
+    --hidden-size 1024 \
+    --num-attention-heads 8 \
     --group-query-attention \
     --num-query-groups 2 \
-    --ffn-hidden-size 1856 \
+    --mamba-num-heads 32 \
+    --ffn-hidden-size 640 \
     --kv-channels 128 \
     --squared-relu \
     --untie-embeddings-and-output-weights \
-    --init-method-std 0.0173 \
+    --init-method-std 0.028 \
     --position-embedding-type none \
     --attention-dropout 0.0 \
     --hidden-dropout 0.0 \
@@ -72,7 +73,7 @@ options=" \
     \
     --num-experts 128 \
     --moe-router-topk 6 \
-    --moe-shared-expert-intermediate-size 3712 \
+    --moe-shared-expert-intermediate-size 1280 \
     --moe-token-dispatcher-type alltoall \
     --moe-router-score-function sigmoid \
     --moe-grouped-gemm \
@@ -87,16 +88,16 @@ options=" \
     --bf16 \
     --seq-length 8192 \
     --max-position-embeddings 8192 \
-    --train-samples 122070313 \
+    --train-samples 17089844 \
     --lr-decay-style WSD \
-    --lr-decay-samples 122070313 \
+    --lr-decay-samples 17089844 \
     --lr-warmup-samples 1024000 \
     --lr-wsd-decay-style minus_sqrt \
-    --lr-wsd-decay-samples 18310547 \
+    --lr-wsd-decay-samples 2563477 \
     --micro-batch-size 1 \
     --global-batch-size 768 \
-    --lr 1.2e-3 \
-    --min-lr 1.2e-5 \
+    --lr 2.0e-3 \
+    --min-lr 2.0e-5 \
     --weight-decay 0.1 \
     --clip-grad 1.0 \
     --adam-beta1 0.9 \
@@ -121,9 +122,9 @@ options=" \
     --use-distributed-optimizer \
     --overlap-grad-reduce \
     --overlap-param-gather \
-    --tensor-model-parallel-size 2 \
+    --tensor-model-parallel-size 1 \
     --sequence-parallel \
-    --expert-model-parallel-size 32 \
+    --expert-model-parallel-size 8 \
     --expert-tensor-parallel-size 1 \
     --pipeline-model-parallel-size 1 \
     --high-priority-stream-groups ep \

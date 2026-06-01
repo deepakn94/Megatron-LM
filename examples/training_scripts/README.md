@@ -19,32 +19,60 @@ and `blend_files/` (see the comment above `ROOT_DIR` for an OCI-HSG example).
 | Script | Arch | Layers | Hidden | MoE | Latent MoE | MTP | Parallelism (TP/EP/PP) | Global batch | Peak LR |
 |---|---|---:|---:|---|---|---|---|---:|---:|
 | `8b_1t.sh` | Dense Transformer (RoPE) | 32 | 4096 | — | — | — | 4 / — / 1 | 1536 | 8e-4 |
-| `8b_latentmoe_1t.sh` | Hybrid Mamba + attention | 61 | 4608 | 512 experts, top-6, shared-expert 6144 | 1152 | 2 layers, `*E` pattern | 2 / 16 / 1 | 3072 | 8e-4 |
-| `3b_moe_1t.sh` | Hybrid Mamba + attention | 52 | 2688 | 128 experts, top-6, shared-expert 3712 | — | — | 2 / 32 / 1 | 768 | 1.2e-3 |
-| `3b_transformer_moe_1t.sh` | Transformer + MoE | 52 | 2688 | 128 experts, top-6, shared-expert 3712 | — | — | 2 / 32 / 1 | 768 | 1.2e-3 |
+| `a8b_120b_latentmoe_1t.sh` | Hybrid Mamba + attention | 61 | 4608 | 512 experts, top-6, shared-expert 6144 | 1152 | 2 layers, `*E` pattern | 2 / 16 / 1 | 3072 | 8e-4 |
+| `a3b_30b_moe_1t.sh` | Hybrid Mamba + attention | 52 | 2688 | 128 experts, top-6, shared-expert 3712 | — | — | 2 / 32 / 1 | 768 | 1.2e-3 |
+| `a3b_30b_transformer_moe_1t.sh` | Transformer + MoE | 52 | 2688 | 128 experts, top-6, shared-expert 3712 | — | — | 2 / 32 / 1 | 768 | 1.2e-3 |
 
 Notes:
 
-- "Hybrid" means a Mamba/attention pattern (`--hybrid-override-pattern`) routed
-  through `mamba_stack_spec`; `--num-layers` equals the length of the pattern
-  string including `*` separators.
-- `3b_transformer_moe_1t.sh` is the same recipe as `3b_moe_1t.sh` but with the
-  Mamba layers replaced by attention (`M`→`*` in the pattern); it uses
-  `hybrid_stack_spec` and `pretrain_hybrid.py`. Total/active params remain
+- "Hybrid" means a Mamba/attention pattern (`--hybrid-layer-pattern`) routed
+  through `hybrid_stack_spec`; the layer count is derived from the pattern
+  string length, including `*` separators.
+- File names follow `a{active}_{total}_{variant}_{horizon}.sh` — the `a`
+  prefix marks the active-parameter count, total params follow, variant
+  (e.g. `moe`, `latentmoe`, `transformer_moe`) next, token horizon last.
+  `8b_1t.sh` is dense (active = total), so it carries no `a` prefix and no
+  total. The `scaling_ladder/` subdirectory follows the same convention.
+- `a3b_30b_transformer_moe_1t.sh` is the same recipe as `a3b_30b_moe_1t.sh`
+  but with the Mamba layers replaced by attention (`M`→`*` in the pattern); it
+  uses `hybrid_stack_spec` and `pretrain_hybrid.py`. Total/active params remain
   roughly the same (an attention layer is somewhat smaller than a Mamba2 layer
   at this hidden size, so non-MoE params drop by ~0.5% of total).
 - "Latent MoE" refers to `--moe-latent-size` (latent compression on the MoE
-  hidden path); only `8b_latentmoe_1t.sh` enables it.
-- "MTP" refers to the Multi-Token-Prediction block
-  (`--mtp-num-layers`, `--mtp-hybrid-override-pattern`,
-  `--mtp-loss-scaling-factor`); only `8b_latentmoe_1t.sh` enables it.
+  hidden path); only `a8b_120b_latentmoe_1t.sh` enables it.
+- "MTP" refers to the Multi-Token-Prediction block (folded into the unified
+  `--hybrid-layer-pattern` via `/`-separated MTP depths); only
+  `a8b_120b_latentmoe_1t.sh` enables it among the scripts in this directory.
 - Both MoE scripts use `--moe-router-score-function sigmoid`,
   `--moe-router-load-balancing-type seq_aux_loss`,
   `--moe-router-topk-scaling-factor 2.5`, and `--moe-router-dtype fp32`.
-- Both hybrid-MoE scripts (`8b_latentmoe_1t.sh`, `3b_moe_1t.sh`) enable CUDA
-  graphs (`--enable-cuda-graph --cuda-graph-scope mamba attn moe_router`);
-  `8b_latentmoe_1t.sh` additionally uses selective recompute of MoE modules.
-  `8b_1t.sh` (dense) does not enable CUDA graphs.
+- All hybrid scripts (`a8b_120b_latentmoe_1t.sh`, `a3b_30b_moe_1t.sh`,
+  `a3b_30b_transformer_moe_1t.sh`) enable CUDA graphs
+  (`--cuda-graph-impl local` with `--cuda-graph-modules mamba attn moe_router`);
+  `a8b_120b_latentmoe_1t.sh` additionally uses selective recompute of MoE
+  modules. `8b_1t.sh` (dense) does not enable CUDA graphs.
+
+## Smaller-scale experiments
+
+To run any of these recipes on fewer GPUs, **weak-scale the global batch
+size**: drop `--nodes` (or `--gpus-per-node`) and reduce `--global-batch-size`
+by the same factor so the per-GPU work stays constant. Don't change
+`--micro-batch-size`; just shrink the global batch.
+
+Example with `a3b_30b_moe_1t.sh` (ships at 96 nodes × 8 GPUs = 768 GPUs,
+`--global-batch-size 768`):
+
+| Nodes | GPUs | `--global-batch-size` |
+|---:|---:|---:|
+| 96 | 768 | 768 (default) |
+| 48 | 384 | 384 |
+| 24 | 192 | 192 |
+| 12 | 96 | 96 |
+
+Keep `--train-samples`, `--lr-decay-samples`, and `--lr-wsd-decay-samples`
+unchanged — the token horizon is the same, you just take more (smaller) steps.
+Make sure the new `--global-batch-size` stays divisible by `DP × micro_batch`
+(DP = `WORLD_SIZE / (TP × PP)`).
 
 ## GB200 / GB300
 
