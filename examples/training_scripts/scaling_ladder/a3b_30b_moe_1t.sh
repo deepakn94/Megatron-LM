@@ -85,7 +85,6 @@ options=" \
     --moe-permute-fusion \
     --use-fused-weighted-squared-relu \
     \
-    --mtp-spec megatron.core.models.hybrid.hybrid_layer_specs hybrid_stack_spec \
     --mtp-use-repeated-layer \
     --mtp-loss-scaling-factor 0.1 \
     --calculate-per-token-loss \

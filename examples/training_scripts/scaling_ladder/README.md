@@ -38,6 +38,6 @@ Notes:
 - `--lr-decay-samples` equals `--train-samples` (full WSD decay); the
   `lr-wsd-decay` tail is 15% of train samples in each case.
 - Only `a3b_30b_moe_1t.sh` enables MTP: pattern gets a `/*E/*E` suffix
-  (two depths, identical `*E` pattern per depth), plus `--mtp-spec`,
+  (two depths, identical `*E` pattern per depth), plus
   `--mtp-use-repeated-layer` (shared weights across depths),
   `--mtp-loss-scaling-factor 0.1`, `--calculate-per-token-loss`.

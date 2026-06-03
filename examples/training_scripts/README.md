@@ -52,6 +52,19 @@ Notes:
   `a8b_120b_latentmoe_1t.sh` additionally uses selective recompute of MoE
   modules. `8b_1t.sh` (dense) does not enable CUDA graphs.
 
+## Sub-directories
+
+- [`scaling_ladder/`](scaling_ladder/README.md) — six AdamW scaling-ladder
+  recipes (315 M–3 B active, 1 B–30 B total, 88 B–1 T tokens). All hybrid
+  Mamba + MoE, used to fit scaling laws. Follows the same `a{active}_{total}_moe_{horizon}.sh`
+  filename convention.
+- [`nemotron3/`](nemotron3/README.md) — three production Nemotron-3 recipes
+  (`nano.sh`, `super.sh`, `ultra.sh`), each on 25 T tokens. Nano on H100 (384
+  nodes / 3072 GPUs); Super on GB200 (768 nodes / 3072 GPUs); Ultra on GB200
+  (1536 nodes / 6144 GPUs). Super and Ultra use FP4 quantization with a
+  TransformerEngine precision config and MTP; Ultra additionally uses the
+  HybridEP flex dispatcher and CPU activation offload.
+
 ## Smaller-scale experiments
 
 To run any of these recipes on fewer GPUs, **weak-scale the global batch
