@@ -19,6 +19,7 @@ and `blend_files/` (see the comment above `ROOT_DIR` for an OCI-HSG example).
 | Script | Arch | Layers | Hidden | MoE | Latent MoE | MTP | Parallelism (TP/EP/PP) | Global batch | Peak LR |
 |---|---|---:|---:|---|---|---|---|---:|---:|
 | `8b_1t.sh` | Dense Transformer (RoPE) | 32 | 4096 | — | — | — | 4 / — / 1 | 1536 | 8e-4 |
+| `8b_hybrid_1t.sh` | Hybrid Mamba + attention | 52 | 4096 | — | — | — | 4 / — / 1 | 1536 | 8e-4 |
 | `a8b_120b_latentmoe_1t.sh` | Hybrid Mamba + attention | 61 | 4608 | 512 experts, top-6, shared-expert 6144 | 1152 | 2 layers, `*E` pattern | 2 / 16 / 1 | 3072 | 8e-4 |
 | `a3b_30b_moe_1t.sh` | Hybrid Mamba + attention | 52 | 2688 | 128 experts, top-6, shared-expert 3712 | — | — | 2 / 32 / 1 | 768 | 1.2e-3 |
 | `a3b_30b_transformer_moe_1t.sh` | Transformer + MoE | 52 | 2688 | 128 experts, top-6, shared-expert 3712 | — | — | 2 / 32 / 1 | 768 | 1.2e-3 |
@@ -31,8 +32,9 @@ Notes:
 - File names follow `a{active}_{total}_{variant}_{horizon}.sh` — the `a`
   prefix marks the active-parameter count, total params follow, variant
   (e.g. `moe`, `latentmoe`, `transformer_moe`) next, token horizon last.
-  `8b_1t.sh` is dense (active = total), so it carries no `a` prefix and no
-  total. The `scaling_ladder/` subdirectory follows the same convention.
+  `8b_1t.sh` and `8b_hybrid_1t.sh` are non-MoE (active = total), so they carry
+  no `a` prefix and no total. The `scaling_ladder/` subdirectory follows the
+  same convention.
 - `a3b_30b_transformer_moe_1t.sh` is the same recipe as `a3b_30b_moe_1t.sh`
   but with the Mamba layers replaced by attention (`M`→`*` in the pattern); it
   uses `hybrid_stack_spec` and `pretrain_hybrid.py`. Total/active params remain
@@ -50,7 +52,8 @@ Notes:
   `a3b_30b_transformer_moe_1t.sh`) enable CUDA graphs
   (`--cuda-graph-impl local` with `--cuda-graph-modules mamba attn moe_router`);
   `a8b_120b_latentmoe_1t.sh` additionally uses selective recompute of MoE
-  modules. `8b_1t.sh` (dense) does not enable CUDA graphs.
+  modules. `8b_1t.sh` (dense) and `8b_hybrid_1t.sh` (non-MoE hybrid) do not
+  enable CUDA graphs.
 
 ## Sub-directories
 
