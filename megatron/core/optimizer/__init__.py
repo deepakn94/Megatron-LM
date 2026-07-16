@@ -839,10 +839,10 @@ def _get_megatron_emerging_optimizer(
             "fall back to the legacy LayerWise ping-pong path."
         )
     if use_separate_distributed_optimizer and any(
-        # ``lion`` is registered in ``_EMERGING_OPTIMIZERS`` but, when used as the muon
-        # scalar optimizer, it must not be routed through a separate DistributedOptimizer:
-        # its state (exp_avg only) is incompatible with DistOpt's Adam-like checkpointing.
-        not (opt_name == eopt_name and opt_name in _EMERGING_OPTIMIZERS) and opt_name != 'lion'
+        # Any group that is not the primary emerging optimizer (``eopt_name``, e.g. muon)
+        # — including scalar optimizers like adam/lion that route non-linear/embedding
+        # params — is handled by a separate DistributedOptimizer with byte-level sharding.
+        not (opt_name == eopt_name and opt_name in _EMERGING_OPTIMIZERS)
         for (opt_name, _), groups in grouped_param_groups.items()
         if groups
     ):
@@ -908,8 +908,8 @@ def _get_megatron_emerging_optimizer(
         else:
             fallback_config = copy.copy(config)
             fallback_config.optimizer = opt_name
-            if use_separate_distributed_optimizer and opt_name != 'lion':
-                # Route non-emerging params through a real DistributedOptimizer
+            if use_separate_distributed_optimizer:
+                # Route non-emerging params (adam/lion) through a real DistributedOptimizer
                 # (byte-level sharding) instead of stuffing them inside LayerWise.
                 for group in groups:
                     assert not group['is_expert_parallel'], (
@@ -938,22 +938,6 @@ def _get_megatron_emerging_optimizer(
                 # TODO(deyuf): ChainedOptimizer currently asserts all sub-optimizers
                 # share the same config. Reset to the top-level config so the
                 # assertion holds when DistOpt+LayerWise are chained.
-                if hasattr(result, 'config'):
-                    result.config = config
-                results.append(result)
-            elif use_layer_wise and opt_name == 'lion':
-                # Lion has only exp_avg state, while DistributedOptimizer's checkpointing path
-                # currently assumes Adam-like exp_avg + exp_avg_sq state. Keep Lion fallback
-                # params outside LayerWise and run them replicated instead of sharding them.
-                fallback_config.use_distributed_optimizer = False
-                result = _get_megatron_optimizer_based_on_param_groups(
-                    config=fallback_config,
-                    model_chunks=model_chunks,
-                    param_groups=groups,
-                    model_parallel_group=model_parallel_group,
-                    pg_collection=pg_collection,
-                    skip_megatron_wrapping=False,
-                )
                 if hasattr(result, 'config'):
                     result.config = config
                 results.append(result)
